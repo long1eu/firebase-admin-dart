@@ -32,15 +32,14 @@ enum TagColor {
   purple('PURPLE'),
   teal('TEAL');
 
-  const TagColor(this.wire);
+  const TagColor(this.name);
 
-  /// The on-the-wire representation used by the Remote Config REST API.
-  final String wire;
+  final String name;
 
-  static TagColor? fromWire(String? value) {
+  static TagColor? fromName(String? value) {
     if (value == null) return null;
     for (final color in TagColor.values) {
-      if (color.wire == value) return color;
+      if (color.name == value) return color;
     }
     return null;
   }
@@ -54,15 +53,14 @@ enum ParameterValueType {
   number('NUMBER'),
   json('JSON');
 
-  const ParameterValueType(this.wire);
+  const ParameterValueType(this.name);
 
-  /// The on-the-wire representation used by the Remote Config REST API.
-  final String wire;
+  final String name;
 
-  static ParameterValueType? fromWire(String? value) {
+  static ParameterValueType? fromName(String? value) {
     if (value == null) return null;
     for (final t in ParameterValueType.values) {
-      if (t.wire == value) return t;
+      if (t.name == value) return t;
     }
     return null;
   }
@@ -75,15 +73,14 @@ enum PercentConditionOperator {
   greaterThan('GREATER_THAN'),
   between('BETWEEN');
 
-  const PercentConditionOperator(this.wire);
+  const PercentConditionOperator(this.name);
 
-  /// The on-the-wire representation used by the Remote Config REST API.
-  final String wire;
+  final String name;
 
-  static PercentConditionOperator fromWire(String? value) {
+  static PercentConditionOperator fromName(String? value) {
     if (value == null) return PercentConditionOperator.unknown;
     for (final op in PercentConditionOperator.values) {
-      if (op.wire == value) return op;
+      if (op.name == value) return op;
     }
     return PercentConditionOperator.unknown;
   }
@@ -109,15 +106,14 @@ enum CustomSignalOperator {
   semanticVersionGreaterThan('SEMANTIC_VERSION_GREATER_THAN'),
   semanticVersionGreaterEqual('SEMANTIC_VERSION_GREATER_EQUAL');
 
-  const CustomSignalOperator(this.wire);
+  const CustomSignalOperator(this.name);
 
-  /// The on-the-wire representation used by the Remote Config REST API.
-  final String wire;
+  final String name;
 
-  static CustomSignalOperator fromWire(String? value) {
+  static CustomSignalOperator fromName(String? value) {
     if (value == null) return CustomSignalOperator.unknown;
     for (final op in CustomSignalOperator.values) {
-      if (op.wire == value) return op;
+      if (op.name == value) return op;
     }
     return CustomSignalOperator.unknown;
   }
@@ -136,10 +132,10 @@ enum ValueSource {
   /// The value came from evaluating a server template parameter.
   valueRemote('remote');
 
-  const ValueSource(this.wire);
+  const ValueSource(this.name);
 
   /// The on-the-wire representation.
-  final String wire;
+  final String name;
 }
 
 // ---------------------------------------------------------------------------
@@ -200,20 +196,20 @@ class RemoteConfigUser {
     );
   }
 
-  /// Email address.
+  /// Email address. Output only.
   final String email;
 
-  /// Display name.
+  /// Display name. Output only.
   final String? name;
 
-  /// Image URL.
+  /// Image URL. Output only.
   final String? imageUrl;
 
   Map<String, Object?> toJson() {
     return <String, Object?>{
       'email': email,
-      if (name != null) 'name': name,
-      if (imageUrl != null) 'imageUrl': imageUrl,
+      'name': ?name,
+      'imageUrl': ?imageUrl,
     };
   }
 }
@@ -232,18 +228,22 @@ class MicroPercentRange {
     );
   }
 
-  /// Exclusive lower bound, in micro-percents (range `[0, 100_000_000]`).
+  /// Lower bound in micro-percents, range `[0, 100_000_000]`.
+  ///
+  /// The bound is **exclusive** at evaluation time: a percentile equal to
+  /// this value does not match.
   final int? microPercentLowerBound;
 
-  /// Inclusive upper bound, in micro-percents (range `[0, 100_000_000]`).
+  /// Upper bound in micro-percents, range `[0, 100_000_000]`.
+  ///
+  /// The bound is **inclusive** at evaluation time: a percentile equal to
+  /// this value matches.
   final int? microPercentUpperBound;
 
   Map<String, Object?> toJson() {
     return <String, Object?>{
-      if (microPercentLowerBound != null)
-        'microPercentLowerBound': microPercentLowerBound,
-      if (microPercentUpperBound != null)
-        'microPercentUpperBound': microPercentUpperBound,
+      'microPercentLowerBound': ?microPercentLowerBound,
+      'microPercentUpperBound': ?microPercentUpperBound,
     };
   }
 }
@@ -260,18 +260,20 @@ class RolloutValue {
     return RolloutValue(
       rolloutId: (json['rolloutId'] as String?) ?? '',
       value: (json['value'] as String?) ?? '',
-      percent: (json['percent'] as num?)?.toInt() ?? 0,
+      percent: (json['percent'] as num?)?.toDouble() ?? 0,
     );
   }
 
-  /// The ID of the rollout this value is linked to.
+  /// The identifier that associates this parameter value with a Rollout.
   final String rolloutId;
 
-  /// The value being rolled out.
+  /// The user-specified value to be rolled out.
   final String value;
 
-  /// Rollout percentage (1–100) representing exposure of this value.
-  final int percent;
+  /// Percentage of users that will receive the rollout value, in the range
+  /// `[0, 100]`. Stored as a `double` because the REST API allows fractional
+  /// percentages.
+  final double percent;
 
   Map<String, Object?> toJson() {
     return <String, Object?>{
@@ -292,7 +294,9 @@ class PersonalizationValue {
     );
   }
 
-  /// The ID of the personalization this value is linked to.
+  /// Identifier that represents a personalization definition. The definition
+  /// is used to resolve the value at config fetch time. This is system
+  /// generated and should not be modified.
   final String personalizationId;
 
   Map<String, Object?> toJson() {
@@ -354,6 +358,7 @@ class ExperimentValue {
   const ExperimentValue({
     required this.experimentId,
     required this.variantValue,
+    this.exposurePercent,
   });
 
   factory ExperimentValue.fromJson(Map<String, Object?> json) {
@@ -363,19 +368,27 @@ class ExperimentValue {
         json['variantValue'],
         ExperimentVariantValue.fromJson,
       ),
+      exposurePercent: (json['exposurePercent'] as num?)?.toDouble(),
     );
   }
 
-  /// The ID of the experiment this value is linked to.
+  /// The identifier that associates this parameter value with an Experiment
+  /// in Firebase A/B Testing.
   final String experimentId;
 
   /// Variants served by this experiment.
   final List<ExperimentVariantValue> variantValue;
 
+  /// Server-side exposure evaluation: the fraction of users exposed to the
+  /// experiment, in the range `[0, 100]` inclusive. `null` if the server did
+  /// not include this field.
+  final double? exposurePercent;
+
   Map<String, Object?> toJson() {
     return <String, Object?>{
       'experimentId': experimentId,
       'variantValue': [for (final v in variantValue) v.toJson()],
+      'exposurePercent': ?exposurePercent,
     };
   }
 }
@@ -533,7 +546,7 @@ class RemoteConfigParameter {
               RemoteConfigParameterValue.fromJson,
             ),
       description: json['description'] as String?,
-      valueType: ParameterValueType.fromWire(json['valueType'] as String?),
+      valueType: ParameterValueType.fromName(json['valueType'] as String?),
     );
   }
 
@@ -544,19 +557,21 @@ class RemoteConfigParameter {
   /// order; the first match wins.
   final Map<String, RemoteConfigParameterValue>? conditionalValues;
 
-  /// Optional human-readable description (≤100 unicode characters).
+  /// Optional human-readable description for this parameter (≤256 unicode
+  /// characters).
   final String? description;
 
-  /// Data type for this parameter. Defaults to [ParameterValueType.string].
+  /// Data type for all values of this parameter in the current version of
+  /// the template. Defaults to [ParameterValueType.string] when unspecified.
   final ParameterValueType? valueType;
 
   Map<String, Object?> toJson() {
     return <String, Object?>{
-      if (defaultValue != null) 'defaultValue': defaultValue!.toJson(),
+      'defaultValue': ?defaultValue?.toJson(),
       if (conditionalValues != null)
         'conditionalValues': _encodeMap(conditionalValues!, (v) => v.toJson()),
-      if (description != null) 'description': description,
-      if (valueType != null) 'valueType': valueType!.wire,
+      'description': ?description,
+      'valueType': ?valueType?.name,
     };
   }
 }
@@ -589,7 +604,7 @@ class RemoteConfigParameterGroup {
 
   Map<String, Object?> toJson() {
     return <String, Object?>{
-      if (description != null) 'description': description,
+      'description': ?description,
       'parameters': _encodeMap(parameters, (p) => p.toJson()),
     };
   }
@@ -614,11 +629,11 @@ class RemoteConfigCondition {
     return RemoteConfigCondition(
       name: (json['name'] as String?) ?? '',
       expression: (json['expression'] as String?) ?? '',
-      tagColor: TagColor.fromWire(json['tagColor'] as String?),
+      tagColor: TagColor.fromName(json['tagColor'] as String?),
     );
   }
 
-  /// Non-empty, unique name of this condition.
+  /// Required. Non-empty and unique name of this condition.
   final String name;
 
   /// Condition expression syntax — see the
@@ -632,7 +647,7 @@ class RemoteConfigCondition {
     return <String, Object?>{
       'name': name,
       'expression': expression,
-      if (tagColor != null) 'tagColor': tagColor!.wire,
+      'tagColor': ?tagColor?.name,
     };
   }
 }
@@ -654,7 +669,7 @@ class NamedCondition {
     );
   }
 
-  /// Non-empty, unique name of this condition.
+  /// Required. Non-empty and unique name of this condition.
   final String name;
 
   /// The structured condition tree.
@@ -691,19 +706,6 @@ sealed class OneOfCondition {
 class OrCondition extends OneOfCondition {
   const OrCondition({this.conditions}) : super._();
 
-  /// Sub-conditions; null or empty evaluates to false.
-  final List<OneOfCondition>? conditions;
-
-  @override
-  Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'orCondition': <String, Object?>{
-        if (conditions != null)
-          'conditions': [for (final c in conditions!) c.toJson()],
-      },
-    };
-  }
-
   factory OrCondition.fromJson(Map<String, Object?> json) {
     final raw = json['conditions'];
     if (raw == null) return const OrCondition();
@@ -720,24 +722,24 @@ class OrCondition extends OneOfCondition {
       ],
     );
   }
-}
 
-/// `AND` collection of conditions; true only if all sub-conditions are true.
-class AndCondition extends OneOfCondition {
-  const AndCondition({this.conditions}) : super._();
-
-  /// Sub-conditions; null or empty evaluates to true.
+  /// Sub-conditions; null or empty evaluates to false.
   final List<OneOfCondition>? conditions;
 
   @override
   Map<String, Object?> toJson() {
     return <String, Object?>{
-      'andCondition': <String, Object?>{
+      'orCondition': <String, Object?>{
         if (conditions != null)
           'conditions': [for (final c in conditions!) c.toJson()],
       },
     };
   }
+}
+
+/// `AND` collection of conditions; true only if all sub-conditions are true.
+class AndCondition extends OneOfCondition {
+  const AndCondition({this.conditions}) : super._();
 
   factory AndCondition.fromJson(Map<String, Object?> json) {
     final raw = json['conditions'];
@@ -755,9 +757,27 @@ class AndCondition extends OneOfCondition {
       ],
     );
   }
+
+  /// Sub-conditions; null or empty evaluates to true.
+  final List<OneOfCondition>? conditions;
+
+  @override
+  Map<String, Object?> toJson() {
+    return <String, Object?>{
+      'andCondition': <String, Object?>{
+        if (conditions != null)
+          'conditions': [for (final c in conditions!) c.toJson()],
+      },
+    };
+  }
 }
 
 /// Always-true condition.
+///
+/// Not declared in the public Firebase Remote Config v1 discovery document
+/// but accepted by the runtime wire format on the `firebase-server`
+/// namespace, so [OneOfCondition.fromJson] decodes it and the evaluator
+/// returns `true` without recursing.
 class TrueCondition extends OneOfCondition {
   const TrueCondition() : super._();
 
@@ -768,6 +788,9 @@ class TrueCondition extends OneOfCondition {
 }
 
 /// Always-false condition.
+///
+/// Not declared in the public Firebase Remote Config v1 discovery document;
+/// see [TrueCondition] for the same caveat.
 class FalseCondition extends OneOfCondition {
   const FalseCondition() : super._();
 
@@ -804,7 +827,7 @@ class PercentCondition extends OneOfCondition {
   factory PercentCondition.fromJson(Map<String, Object?> json) {
     final rangeJson = json['microPercentRange'];
     return PercentCondition(
-      percentOperator: PercentConditionOperator.fromWire(
+      percentOperator: PercentConditionOperator.fromName(
         json['percentOperator'] as String?,
       ),
       microPercent: (json['microPercent'] as num?)?.toInt(),
@@ -831,11 +854,10 @@ class PercentCondition extends OneOfCondition {
   Map<String, Object?> toJson() {
     return <String, Object?>{
       'percent': <String, Object?>{
-        if (percentOperator != null) 'percentOperator': percentOperator!.wire,
-        if (microPercent != null) 'microPercent': microPercent,
-        if (seed != null) 'seed': seed,
-        if (microPercentRange != null)
-          'microPercentRange': microPercentRange!.toJson(),
+        'percentOperator': ?percentOperator?.name,
+        'microPercent': ?microPercent,
+        'seed': ?seed,
+        'microPercentRange': ?microPercentRange?.toJson(),
       },
     };
   }
@@ -871,7 +893,7 @@ class CustomSignalCondition extends OneOfCondition {
   factory CustomSignalCondition.fromJson(Map<String, Object?> json) {
     final values = json['targetCustomSignalValues'];
     return CustomSignalCondition(
-      customSignalOperator: CustomSignalOperator.fromWire(
+      customSignalOperator: CustomSignalOperator.fromName(
         json['customSignalOperator'] as String?,
       ),
       customSignalKey: json['customSignalKey'] as String?,
@@ -881,24 +903,26 @@ class CustomSignalCondition extends OneOfCondition {
     );
   }
 
-  /// Operator; null is treated as [CustomSignalOperator.unknown].
+  /// Required. Operator used to compare the actual value against
+  /// [targetCustomSignalValues]. Null is treated as
+  /// [CustomSignalOperator.unknown] and evaluates to false.
   final CustomSignalOperator? customSignalOperator;
 
-  /// The key to look up in [EvaluationContext.customSignals].
+  /// Required. The custom signal name to look up in
+  /// [EvaluationContext.customSignals].
   final String? customSignalKey;
 
-  /// Up to 100 target values (1 for numeric / semver operators).
+  /// Required. 1–100 target values. Numeric and semantic-version operators
+  /// must receive exactly one value; string operators may receive multiple.
   final List<String>? targetCustomSignalValues;
 
   @override
   Map<String, Object?> toJson() {
     return <String, Object?>{
       'customSignal': <String, Object?>{
-        if (customSignalOperator != null)
-          'customSignalOperator': customSignalOperator!.wire,
-        if (customSignalKey != null) 'customSignalKey': customSignalKey,
-        if (targetCustomSignalValues != null)
-          'targetCustomSignalValues': targetCustomSignalValues,
+        'customSignalOperator': ?customSignalOperator?.name,
+        'customSignalKey': ?customSignalKey,
+        'targetCustomSignalValues': ?targetCustomSignalValues,
       },
     };
   }
@@ -984,7 +1008,7 @@ class RemoteConfigTemplate {
       'parameters': _encodeMap(parameters, (p) => p.toJson()),
       'parameterGroups': _encodeMap(parameterGroups, (g) => g.toJson()),
       'etag': etag,
-      if (version != null) 'version': version!.toJson(),
+      'version': ?version?.toJson(),
     };
   }
 }
@@ -1094,45 +1118,49 @@ class Version {
     );
   }
 
-  /// Version number (int64 string).
+  /// Version number (int64 string). Output only.
   final String? versionNumber;
 
-  /// When this version was written to the backend.
+  /// When this version was written to the backend. Output only.
   final DateTime? updateTime;
 
   /// Source that triggered the update, as stamped by the Remote Config server
   /// (e.g. `CONSOLE`, `REST_API`, an `ADMIN_SDK_*` variant, or
   /// [updateOriginUnspecified]). The exact set of values is defined by the
   /// Remote Config service; clients should treat this as an opaque string.
+  /// Output only.
   final String? updateOrigin;
 
   /// Update type — e.g. `INCREMENTAL_UPDATE`, `FORCED_UPDATE`, `ROLLBACK`,
-  /// or [updateTypeUnspecified].
+  /// or [updateTypeUnspecified]. Output only.
   final String? updateType;
 
-  /// User who performed the update.
+  /// Account that performed the update. Output only.
   final RemoteConfigUser? updateUser;
 
-  /// User-provided description for this version.
+  /// User-provided description for this version. The only field on a Version
+  /// that is settable on input — all other fields are output only and any
+  /// values supplied at publish time are silently ignored by the server.
   final String? description;
 
-  /// Version number this was rolled back from (if applicable).
+  /// Version number this was rolled back from (int64 string). Output only;
+  /// only present if this version is the result of a rollback.
   final String? rollbackSource;
 
   /// Whether this version was published before version history was supported.
+  /// Output only.
   final bool? isLegacy;
 
   Map<String, Object?> toJson() {
     return <String, Object?>{
-      if (versionNumber != null) 'versionNumber': versionNumber,
-      if (updateTime != null)
-        'updateTime': updateTime!.toUtc().toIso8601String(),
-      if (updateOrigin != null) 'updateOrigin': updateOrigin,
-      if (updateType != null) 'updateType': updateType,
-      if (updateUser != null) 'updateUser': updateUser!.toJson(),
-      if (description != null) 'description': description,
-      if (rollbackSource != null) 'rollbackSource': rollbackSource,
-      if (isLegacy != null) 'isLegacy': isLegacy,
+      'versionNumber': ?versionNumber,
+      'updateTime': ?updateTime?.toUtc().toIso8601String(),
+      'updateOrigin': ?updateOrigin,
+      'updateType': ?updateType,
+      'updateUser': ?updateUser?.toJson(),
+      'description': ?description,
+      'rollbackSource': ?rollbackSource,
+      'isLegacy': ?isLegacy,
     };
   }
 }
