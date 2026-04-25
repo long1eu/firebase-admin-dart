@@ -287,6 +287,21 @@ jobs:
       - name: Run WIF auth test
         run: dart test test/integration/app/firebase_app_prod_test.dart --concurrency=1
 
+      # Remote Config integration tests (publish/rollback round-trip).
+      # Requires:
+      #   - `RC_TEST_PROJECT_ID` repository secret = target Firebase
+      #     project ID. Skipped automatically if unset.
+      #   - The bound WIF service account holds
+      #     `roles/firebaseremoteconfig.admin` on that project.
+      #   - The bound WIF service account holds
+      #     `roles/firebaseanalytics.viewer` on the linked GA property
+      #     (the `rollback()` REST endpoint validates against GA data
+      #     even when the target template uses no GA-derived conditions).
+      - name: Run Remote Config integration tests
+        env:
+          RC_TEST_PROJECT_ID: ${{ secrets.RC_TEST_PROJECT_ID }}
+        run: dart test test/integration/remote_config/ --concurrency=1
+
   publish:
     name: Publish verification
     runs-on: ubuntu-latest

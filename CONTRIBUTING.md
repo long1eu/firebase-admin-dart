@@ -164,6 +164,22 @@ RUN_PROD_TESTS=true dart test test/app/firebase_app_prod_test.dart --concurrency
 
 See [`README.md`](README.md) for Firebase project setup details. You can create a project in the [Firebase Console](https://console.firebase.google.com) if you don't have one already.
 
+#### Remote Config Integration Tests
+
+Run a publish / rollback round-trip against a real project:
+
+```bash
+export RC_TEST_PROJECT_ID=<your-firebase-project-id>
+RUN_PROD_TESTS=true dart test test/integration/remote_config/ --concurrency=1
+```
+
+The bound credential (ADC user, service account, or WIF) must hold:
+
+- `roles/firebaseremoteconfig.admin` on the target project, **and**
+- `roles/firebaseanalytics.viewer` on the linked Google Analytics property — the Remote Config `rollback()` endpoint validates against GA data even when the target template uses no GA-derived conditions.
+
+The suite restores baseline state on a successful run (the marker parameter it publishes is rolled back at the end). One existing template version must be present so rollback has a target to restore — newly-created projects without prior published versions will skip the rollback assertion.
+
 ### Code Formatting and Analysis
 
 ```bash

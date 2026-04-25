@@ -1,5 +1,6 @@
 ## 0.5.2-wip
 
+- Add Remote Config support: template management (`getTemplate`, `validateTemplate`, `publishTemplate`, `rollback`, `listVersions`, `createTemplateFromJson`) and server-side template evaluation (`getServerTemplate`, `initServerTemplate`, `ServerTemplate.evaluate`).
 - Remove dependency on `package:equatable`.
 - Make `Query`, `CollectionReference`, `DocumentReference`, and `CollectionGroup` mockable.
 
